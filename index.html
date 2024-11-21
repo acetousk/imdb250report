@@ -18,7 +18,16 @@
     </section>
     <section>
         <h2>Ranking of Streaming Providers</h2>
-        <ul id="rankingList"></ul>
+        <table id="rankingTable" aria-label="Ranking of Streaming Providers">
+            <thead>
+                <tr>
+                    <th>Provider Name</th>
+                    <th>Number of Movies</th>
+                    <th>Provider Movie Quality (lower is better)</th>
+                </tr>
+            </thead>
+            <tbody id="rankingList"></tbody>
+        </table>
     </section>
     <section>
         <h2>Filter Movies by Streaming Provider</h2>
@@ -26,7 +35,17 @@
         <select id="providerFilter" multiple aria-label="Filter Movies by Streaming Provider">
             <option value="all">All Providers</option>
         </select>
-        <ul id="filteredMovies" aria-label="List of Movies Filtered by Selected Providers"></ul>
+        <table id="filteredMoviesTable" aria-label="List of Movies Filtered by Selected Providers">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Movie Name</th>
+                    <th>Streaming Providers</th>
+                    <th>Plot</th>
+                </tr>
+            </thead>
+            <tbody id="filteredMovies"></tbody>
+        </table>
     </section>
 
     <script>
@@ -69,38 +88,48 @@
 
                 allMoviesData = data;
 
-                // Extracting all streaming providers and counting occurrences
-                const providerCounts = {};
+                // Extracting all streaming providers and counting occurrences and quality
+                const providerStats = {};
                 data.forEach(item => {
+                    const movieRating = data.indexOf(item) + 1 || 0;
                     if (item.streamingProviders.length === 0) {
-                        if (providerCounts['Only Buy/Rent']) {
-                            providerCounts['Only Buy/Rent']++;
-                        } else {
-                            providerCounts['Only Buy/Rent'] = 1;
+                        if (!providerStats['Only Buy/Rent']) {
+                            providerStats['Only Buy/Rent'] = { count: 0, totalRating: 0 };
                         }
+                        providerStats['Only Buy/Rent'].count++;
+                        providerStats['Only Buy/Rent'].totalRating += movieRating;
                     } else {
                         item.streamingProviders.forEach(provider => {
-                            if (providerCounts[provider]) {
-                                providerCounts[provider]++;
-                            } else {
-                                providerCounts[provider] = 1;
+                            if (!providerStats[provider]) {
+                                providerStats[provider] = { count: 0, totalRating: 0 };
                             }
+                            providerStats[provider].count++;
+                            providerStats[provider].totalRating += movieRating;
                         });
                     }
                 });
 
-                allProvidersData = providerCounts;
-                updateChart(providerCounts, true);
+                allProvidersData = providerStats;
+                updateChart(providerStats, true);
 
-                // Creating a ranking list for streaming providers
-                const sortedProviders = Object.entries(providerCounts).sort((a, b) => b[1] - a[1]);
+                // Creating a ranking table for streaming providers
+                const sortedProviders = Object.entries(providerStats).sort((a, b) => b[1].count - a[1].count);
                 const rankingList = document.getElementById('rankingList');
                 const providerFilter = document.getElementById('providerFilter');
 
-                sortedProviders.forEach(([provider, count]) => {
-                    const listItem = document.createElement('li');
-                    listItem.textContent = `${provider}: ${count} movie(s)`;
-                    rankingList.appendChild(listItem);
+                sortedProviders.forEach(([provider, stats], index) => {
+                    const tableRow = document.createElement('tr');
+                    const providerNameCell = document.createElement('td');
+                    providerNameCell.textContent = provider;
+                    const countCell = document.createElement('td');
+                    countCell.textContent = stats.count;
+                    const qualityCell = document.createElement('td');
+                    qualityCell.textContent = (stats.totalRating / stats.count).toFixed(2);
+                    
+                    tableRow.appendChild(providerNameCell);
+                    tableRow.appendChild(countCell);
+                    tableRow.appendChild(qualityCell);
+                    rankingList.appendChild(tableRow);
 
                     // Adding providers to the filter dropdown
                     const option = document.createElement('option');
@@ -117,10 +146,22 @@
 
                     data.forEach(item => {
                         if (selectedProviders.includes('all') || selectedProviders.some(provider => item.streamingProviders.includes(provider)) || (selectedProviders.includes('Only Buy/Rent') && item.streamingProviders.length === 0)) {
-                            const filteredItem = document.createElement('li');
+                            const filteredRow = document.createElement('tr');
                             const movieIndex = data.indexOf(item) + 1;
-                    filteredItem.textContent = `${movieIndex}. ${item.movieName}: ${item.plotText}`;
-                            filteredMovies.appendChild(filteredItem);
+                            const movieIndexCell = document.createElement('td');
+                            movieIndexCell.textContent = movieIndex;
+                            const movieNameCell = document.createElement('td');
+                            movieNameCell.textContent = item.movieName;
+                            const providersCell = document.createElement('td');
+                            providersCell.textContent = item.streamingProviders.length > 0 ? item.streamingProviders.join(', ') : 'Only Buy/Rent';
+                            const plotCell = document.createElement('td');
+                            plotCell.textContent = item.plotText;
+                            
+                            filteredRow.appendChild(movieIndexCell);
+                            filteredRow.appendChild(movieNameCell);
+                            filteredRow.appendChild(providersCell);
+                            filteredRow.appendChild(plotCell);
+                            filteredMovies.appendChild(filteredRow);
                         }
                     });
                 });
@@ -139,10 +180,10 @@
         function updateChart(providerCounts, hideHidden) {
             const providerLabels = [];
             const providerData = [];
-            for (const [provider, count] of Object.entries(providerCounts)) {
+            for (const [provider, stats] of Object.entries(providerCounts)) {
                 if (!hideHidden || !hiddenProviders.includes(provider)) {
                     providerLabels.push(provider);
-                    providerData.push(count);
+                    providerData.push(stats.count);
                 }
             }
 
