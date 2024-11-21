@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Explore the market share of streaming providers with detailed statistics and a list of movies filtered by providers. Find out which streaming platforms host your favorite movies.">
+    <title>Movie Streaming Market Share | Streaming Providers and Top 250 IMDb Movies</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Movie Streaming Market Share and Rankings of Top 250 IMDb Movies</h1>
+    </header>
+    <section>
+        <h2>Market Share of Streaming Providers</h2>
+        <button id="toggleButton">Show Hidden Providers in Chart</button>
+        <canvas id="pieChart" aria-label="Market Share of Streaming Providers Chart" role="img"></canvas>
+    </section>
+    <section>
+        <h2>Ranking of Streaming Providers</h2>
+        <ul id="rankingList"></ul>
+    </section>
+    <section>
+        <h2>Filter Movies by Streaming Provider</h2>
+        <label for="providerFilter">Select Providers to Filter:</label>
+        <select id="providerFilter" multiple aria-label="Filter Movies by Streaming Provider">
+            <option value="all">All Providers</option>
+        </select>
+        <ul id="filteredMovies" aria-label="List of Movies Filtered by Selected Providers"></ul>
+    </section>
+
+    <script>
+        const hiddenProviders = [
+            'AMC+',
+            'TBS',
+            'TNT',
+            'Bravo Now',
+            'E! Now',
+            'NBC',
+            'Syfy Now',
+            'Telemundo Now',
+            'BBC America',
+            'Tribeca Shortlist',
+            'STARZ',
+            'Filmbox',
+            'Crunchyroll',
+            'Magnolia Selects',
+            'Shout! Factory TV',
+            'Cohen Media Channel',
+            'Fandor',
+            'IFC Films Unlimited',
+            'France Channel'
+        ];
+
+        let allProvidersData;
+        let allMoviesData;
+
+        fetch('https://gist.githubusercontent.com/acetousk/f0c2ac34008d60c4cbee3f37b33b2387/raw/85742bfb698c4cfff4d37e3b90d711e994c78820/asdf.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!Array.isArray(data)) {
+                    throw new Error('Invalid data format, expected an array');
+                }
+
+                allMoviesData = data;
+
+                // Extracting all streaming providers and counting occurrences
+                const providerCounts = {};
+                data.forEach(item => {
+                    if (item.streamingProviders.length === 0) {
+                        if (providerCounts['Only Buy/Rent']) {
+                            providerCounts['Only Buy/Rent']++;
+                        } else {
+                            providerCounts['Only Buy/Rent'] = 1;
+                        }
+                    } else {
+                        item.streamingProviders.forEach(provider => {
+                            if (providerCounts[provider]) {
+                                providerCounts[provider]++;
+                            } else {
+                                providerCounts[provider] = 1;
+                            }
+                        });
+                    }
+                });
+
+                allProvidersData = providerCounts;
+                updateChart(providerCounts, true);
+
+                // Creating a ranking list for streaming providers
+                const sortedProviders = Object.entries(providerCounts).sort((a, b) => b[1] - a[1]);
+                const rankingList = document.getElementById('rankingList');
+                const providerFilter = document.getElementById('providerFilter');
+
+                sortedProviders.forEach(([provider, count]) => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `${provider}: ${count} movie(s)`;
+                    rankingList.appendChild(listItem);
+
+                    // Adding providers to the filter dropdown
+                    const option = document.createElement('option');
+                    option.value = provider;
+                    option.textContent = provider;
+                    providerFilter.appendChild(option);
+                });
+
+                // Filter movies by provider
+                providerFilter.addEventListener('change', () => {
+                    const selectedProviders = Array.from(providerFilter.selectedOptions).map(option => option.value);
+                    const filteredMovies = document.getElementById('filteredMovies');
+                    filteredMovies.innerHTML = '';
+
+                    data.forEach(item => {
+                        if (selectedProviders.includes('all') || selectedProviders.some(provider => item.streamingProviders.includes(provider)) || (selectedProviders.includes('Only Buy/Rent') && item.streamingProviders.length === 0)) {
+                            const filteredItem = document.createElement('li');
+                            const movieIndex = data.indexOf(item) + 1;
+                    filteredItem.textContent = `${movieIndex}. ${item.movieName}: ${item.plotText}`;
+                            filteredMovies.appendChild(filteredItem);
+                        }
+                    });
+                });
+
+                // Toggle button to show/hide hidden providers in chart
+                const toggleButton = document.getElementById('toggleButton');
+                let hidden = true;
+                toggleButton.addEventListener('click', () => {
+                    hidden = !hidden;
+                    updateChart(allProvidersData, hidden);
+                    toggleButton.textContent = hidden ? 'Show Hidden Providers in Chart' : 'Hide Hidden Providers in Chart';
+                });
+            })
+            .catch(error => console.error('Error fetching data:', error));
+
+        function updateChart(providerCounts, hideHidden) {
+            const providerLabels = [];
+            const providerData = [];
+            for (const [provider, count] of Object.entries(providerCounts)) {
+                if (!hideHidden || !hiddenProviders.includes(provider)) {
+                    providerLabels.push(provider);
+                    providerData.push(count);
+                }
+            }
+
+            const ctx = document.getElementById('pieChart').getContext('2d');
+            if (window.currentChart) {
+                window.currentChart.destroy();
+            }
+            window.currentChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: providerLabels,
+                    datasets: [{
+                        data: providerData,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(255, 205, 86, 0.6)',
+                            'rgba(201, 203, 207, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(255, 205, 86, 1)',
+                            'rgba(201, 203, 207, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
